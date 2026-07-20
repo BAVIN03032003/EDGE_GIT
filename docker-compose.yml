@@ -1,7 +1,7 @@
 services:
   edge:
     container_name: edge-app
-    image: ghcr.io/teampresence-production/gitaction-edge:latest
+    image: ghcr.io/bavin03032003/edge_git:latest
     # Support ARM64 and AMD64 via fallback platform
     platform: ${DOCKER_DEFAULT_PLATFORM:-linux/amd64}
     restart: unless-stopped

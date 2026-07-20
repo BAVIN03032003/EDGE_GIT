@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: BAVIN03032003/EDGE_GIT
+  IMAGE_NAME: bavin03032003/edge_git
   GIT_SHA: ${{ github.sha }}
 
 jobs:
