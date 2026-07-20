@@ -72,7 +72,11 @@ Write-Success "Authentication configured in $AuthFile"
  
 # 4.5 Login to GHCR for the host
 Write-Info "Logging into GHCR for host Docker daemon..."
-echo $Token | docker login ghcr.io -u $User --password-stdin | Out-Null
+$Token | docker login ghcr.io -u $User --password-stdin | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "GHCR login failed. Use a BAVIN03032003 PAT with read:packages access."
+    exit 1
+}
  
 # 5. Check for Docker
 function Install-Docker {
@@ -167,15 +171,18 @@ $env:IS_MANUAL_UPDATE = 0
  
 if (Get-Command "docker-compose" -ErrorAction SilentlyContinue) {
     docker-compose up -d
+    docker-compose up -d --force-recreate updater
 } else {
     docker compose up -d
+    docker compose up -d --force-recreate updater
 }
  
 Write-Success "Edge application is starting!"
 Write-Info "Opening browser at http://localhost:3000..."
 Start-Sleep -Seconds 5
 Start-Process "http://localhost:3000"
- 
+return
+
  # setup-edge.ps1 - Automated Setup for Edge Collector on Windows
  
 $EdgeHome = "C:\edge"
