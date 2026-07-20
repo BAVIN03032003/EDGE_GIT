@@ -1,20 +1,20 @@
 #!/bin/bash
 # setup-edge.sh - Automated Setup for Edge Collector on Linux
-
+ 
 EDGE_HOME="/opt/edge"
 LOGS_DIR="$EDGE_HOME/logs"
 ENV_FILE="$EDGE_HOME/.env"
 AUTH_FILE="$(pwd)/watchtower-auth.json"
-
+ 
 log_info() { echo -e "\033[0;36m[INFO] $1\033[0m"; }
 log_success() { echo -e "\033[0;32m[SUCCESS] $1\033[0m"; }
 log_error() { echo -e "\033[0;31m[ERROR] $1\033[0m"; }
-
+ 
 # 1. Ensure Directories
 log_info "Ensuring directories exist in $EDGE_HOME..."
 sudo mkdir -p "$LOGS_DIR"
 sudo chown -R $USER:$USER "$EDGE_HOME"
-
+ 
 # 2. Create .env if it doesn't exist
 if [ ! -f "$ENV_FILE" ]; then
     log_info "Creating default .env file..."
@@ -24,23 +24,23 @@ CLOUD_URL=
 API_KEY=
 SOCKETIO_PATH=socket.io
 SOCKETIO_NAMESPACE=
-
+ 
 # Edge Configuration
 EDGE_NAME=My-Edge-Collector
 EDGE_ID=edge_$((1000 + RANDOM % 9000))
 LOCATION=Unknown
-
+ 
 # Application Settings
 WEB_UI_HOST=0.0.0.0
 WEB_UI_PORT=5001
 LOG_LEVEL=INFO
-
+ 
 # Update Preferences
 IS_MANUAL_UPDATE=0
 EOF
     log_success "Created default .env at $ENV_FILE. Please update it with your credentials."
 fi
-
+ 
 # 3. Check for Docker
 install_docker() {
     log_info "Docker not found. Attempting to install Docker..."
@@ -57,7 +57,7 @@ install_docker() {
         exit 1
     fi
 }
-
+ 
 log_info "Checking for Docker..."
 if ! command -v docker &> /dev/null; then
     read -p "Docker not found. Install it now? (y/n) " -n 1 -r
@@ -69,7 +69,7 @@ if ! command -v docker &> /dev/null; then
         exit 1
     fi
 fi
-
+ 
 # 4. GitHub Setup (Watchtower Auth)
 log_info "Configuring GitHub Authentication for updates..."
 USER_GH="Teampresence-production"
@@ -79,7 +79,7 @@ if [ -z "$TOKEN_GH" ]; then
     echo
 fi
 AUTH=$(echo -n "${USER_GH}:${TOKEN_GH}" | base64)
-
+ 
 cat <<EOF > "$AUTH_FILE"
 {
   "auths": {
@@ -90,17 +90,17 @@ cat <<EOF > "$AUTH_FILE"
 }
 EOF
 log_success "Authentication configured in $AUTH_FILE"
-
+ 
 # 4.5 Login to GHCR for the host
 log_info "Logging into GHCR for host Docker daemon..."
 echo "$TOKEN_GH" | docker login ghcr.io -u "$USER_GH" --password-stdin
-
+ 
 # 4. Start Docker Compose
 log_info "Starting Edge application via Docker Compose..."
 export LOGS_DIR="$LOGS_DIR"
 export ENV_FILE="$ENV_FILE"
 export IS_MANUAL_UPDATE=0
-
+ 
 if command -v docker-compose &> /dev/null; then
     docker-compose up -d
 elif docker compose version &> /dev/null; then
@@ -109,7 +109,7 @@ else
     log_error "Docker Compose not found! Please install docker-compose."
     exit 1
 fi
-
+ 
 log_success "Edge application is starting!"
 log_info "Opening browser at http://localhost:3000..."
 sleep 5
@@ -120,3 +120,5 @@ elif command -v open &> /dev/null; then
 else
     log_info "Please visit http://localhost:3000 to complete setup."
 fi
+ 
+ 
