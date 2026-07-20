@@ -239,6 +239,7 @@ Manual Platform Plugin: SamsungMDCPlugin
 """
 import socket
 import json
+import os
 import threading
 import time
 import re
@@ -463,25 +464,55 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
                 return False
         
         def get_mac():
+            mac_pattern = r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}(?![0-9a-fA-F])"
             try:
-                if not shutil.which("arp"):
-                    return None
                 if platform.system().lower() == "windows":
+                    if not shutil.which("arp"):
+                        return None
                     output = subprocess.check_output(["arp", "-a", ip], text=True)
-                    match = re.search(r"([0-9a-fA-F]{2}[-:]){5}[0-9a-fA-F]{2}", output)
-                else:
+                    match = re.search(mac_pattern, output)
+                    return match.group(0).replace("-", ":").lower() if match else None
+
+                # Containers often do not include the legacy arp executable. The
+                # kernel neighbor table is available on standard Linux images.
+                arp_path = "/proc/net/arp"
+                if os.path.exists(arp_path):
+                    with open(arp_path, encoding="utf-8") as arp_table:
+                        for line in arp_table.readlines()[1:]:
+                            fields = line.split()
+                            if len(fields) >= 4 and fields[0] == ip:
+                                mac = fields[3]
+                                if re.fullmatch(mac_pattern, mac):
+                                    return mac.replace("-", ":").lower()
+
+                if shutil.which("ip"):
+                    output = subprocess.check_output(
+                        ["ip", "neigh", "show", ip], text=True, stderr=subprocess.DEVNULL
+                    )
+                    match = re.search(mac_pattern, output)
+                    if match:
+                        return match.group(0).replace("-", ":").lower()
+
+                if shutil.which("arp"):
                     output = subprocess.check_output(["arp", "-n", ip], text=True)
-                    match = re.search(r"([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}", output)
-                return match.group(0).lower() if match else None
+                    match = re.search(mac_pattern, output)
+                    if match:
+                        return match.group(0).replace("-", ":").lower()
             except Exception:
-                return None
+                pass
+            return None
         
         ping_online = ping_host()
         is_online = ping_online if ping_online is not None else tcp_probe()
+        # The reachability check creates the ARP/neighbor entry on hosts where it
+        # is visible to this process, so look up the MAC after that check.
         mac = get_mac() if is_online else None
         upnp_info = self._discover_upnp(ip) if is_online else {}
-        
-        serial = upnp_info.get("serial") or mac
+
+        configured_mac = self.config.get("mac_address") or self.config.get("mac")
+        configured_serial = self.config.get("serial_number") or self.config.get("serial")
+        mac = mac or configured_mac
+        serial = upnp_info.get("serial") or configured_serial or mac
         
         return {
             "ip_address":    ip,
