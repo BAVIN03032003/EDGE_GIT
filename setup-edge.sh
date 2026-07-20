@@ -72,11 +72,11 @@ fi
 
 # 4. GitHub Setup (Watchtower Auth)
 log_info "Configuring GitHub Authentication for updates..."
-USER_GH="${GHCR_USER:-Teampresence-production}"
+USER_GH="Teampresence-production"
 TOKEN_GH="${GHCR_TOKEN:-}"
 if [ -z "$TOKEN_GH" ]; then
-    log_error "GHCR_TOKEN environment variable is required for GHCR authentication."
-    exit 1
+    read -rsp "Enter GHCR token: " TOKEN_GH
+    echo
 fi
 AUTH=$(echo -n "${USER_GH}:${TOKEN_GH}" | base64)
 

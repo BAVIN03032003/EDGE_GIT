@@ -59,11 +59,11 @@ if (-not (Test-Path $EnvFile)) {
 
 # 4. GitHub Setup (Watchtower Auth)
 Write-Info "Configuring GitHub Authentication for updates..."
-$User = if ($env:GHCR_USER) { $env:GHCR_USER } else { "Teampresence-production" }
+$User = "Teampresence-production"
 $Token = $env:GHCR_TOKEN
 if (-not $Token) {
-    Write-Error "GHCR_TOKEN environment variable is required for GHCR authentication."
-    exit 1
+    $SecureToken = Read-Host "Enter GHCR token" -AsSecureString
+    $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken))
 }
 $Auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${User}:${Token}"))
 $Config = @{ auths = @{ "ghcr.io" = @{ auth = $Auth } } }
