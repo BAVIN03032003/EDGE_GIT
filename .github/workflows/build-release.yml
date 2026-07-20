@@ -81,7 +81,7 @@ jobs:
 
       - name: Run smoke test
         run: |
-          docker run --rm --env-file ./.env.example release-smoke:latest ./edge-app-binary --health || exit 1
+          docker run --rm --entrypoint /app/edge-app-binary release-smoke:latest --health || exit 1
 
       - name: Push to Container Registry
         uses: docker/build-push-action@v5
