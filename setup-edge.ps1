@@ -65,7 +65,7 @@ if (-not $Token) {
     $SecureToken = Read-Host "Enter GHCR token" -AsSecureString
     $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken))
 }
-$Token = $Token.Trim()
+$Token = ($Token -replace '[\p{C}\s]', '')
 $Auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${User}:${Token}"))
 $Config = @{ auths = @{ "ghcr.io" = @{ auth = $Auth } } }
 $Config | ConvertTo-Json | Out-File -FilePath $AuthFile -Encoding ascii
