@@ -1788,6 +1788,11 @@ class CloudConnector:
         "power_conditioner": "power_conditioner",
         "vector":            "power_conditioner",
         "powerconditioner":  "power_conditioner",
+        "qsys":  "qsys",
+        "q-sys": "qsys",
+        "qsc":   "qsys",
+        
+ 
 
         "cisco_roomos": "cisco_roomos",
         "cisco":        "cisco_roomos",
