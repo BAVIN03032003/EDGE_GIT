@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*'
 
@@ -59,7 +61,7 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix=sha-
             type=ref,event=tag,enable=${{ steps.version.outputs.is_prerelease != 'true' }},suffix=,pattern={{branch}}
-            type=raw,value=latest,enable=${{ steps.version.outputs.is_prerelease != 'true' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || steps.version.outputs.is_prerelease != 'true' }}
 
       - name: Build smoke-test image
         uses: docker/build-push-action@v5
@@ -105,7 +107,7 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
-        if: steps.version.outputs.is_prerelease != 'true'
+        if: startsWith(github.ref, 'refs/tags/v') && steps.version.outputs.is_prerelease != 'true'
         with:
           body: |
             ## Edge Application v${{ steps.version.outputs.version }}
@@ -135,7 +137,7 @@ jobs:
 
       - name: Create Pre-release
         uses: softprops/action-gh-release@v1
-        if: steps.version.outputs.is_prerelease == 'true'
+        if: startsWith(github.ref, 'refs/tags/v') && steps.version.outputs.is_prerelease == 'true'
         with:
           body: |
             ## Edge Application v${{ steps.version.outputs.version }} (Pre-release)
