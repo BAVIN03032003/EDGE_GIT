@@ -2,10 +2,9 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -23,7 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Get current date
         id: date
@@ -36,9 +35,6 @@ jobs:
           VERSION="${TAG_NAME#v}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "is_prerelease=$(echo $VERSION | grep -qE '-(beta|rc|alpha)' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -64,7 +60,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || steps.version.outputs.is_prerelease != 'true' }}
 
       - name: Build smoke-test image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -84,12 +80,12 @@ jobs:
           docker run --rm --entrypoint /app/edge-app-binary release-smoke:latest --health || exit 1
 
       - name: Push to Container Registry
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: push
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
