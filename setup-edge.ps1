@@ -59,7 +59,7 @@ if (-not (Test-Path $EnvFile)) {
  
 # 4. GitHub Setup (Watchtower Auth)
 Write-Info "Configuring GitHub Authentication for updates..."
-$User = "Teampresence-production"
+$User = "BAVIN03032003"
 $Token = $env:GHCR_TOKEN
 if (-not $Token) {
     $SecureToken = Read-Host "Enter GHCR token" -AsSecureString

@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: teampresence-production/gitaction-edge
+  IMAGE_NAME: BAVIN03032003/EDGE_GIT
   GIT_SHA: ${{ github.sha }}
 
 jobs:

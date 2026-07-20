@@ -72,7 +72,7 @@ fi
  
 # 4. GitHub Setup (Watchtower Auth)
 log_info "Configuring GitHub Authentication for updates..."
-USER_GH="Teampresence-production"
+USER_GH="BAVIN03032003"
 TOKEN_GH="${GHCR_TOKEN:-}"
 if [ -z "$TOKEN_GH" ]; then
     read -rsp "Enter GHCR token: " TOKEN_GH
