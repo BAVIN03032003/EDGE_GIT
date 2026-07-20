@@ -815,6 +815,7 @@ import json
 import threading
 import time
 import re
+import logging
 import asyncio
 import subprocess
 import platform
@@ -822,6 +823,9 @@ import requests
 import xml.etree.ElementTree as ET
  
 from .base import ManualPlatformPlugin
+
+
+logger = logging.getLogger(__name__)
  
  
 class SamsungMDCPlugin(ManualPlatformPlugin):
@@ -1024,7 +1028,14 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
     def _get_mdc_identity(self, ip, port, display_id):
         identity = {}
         for field, cmd in self.IDENTITY_COMMANDS.items():
-            value = self._query_mdc_string(ip, port, display_id, cmd)
+            # QB series occasionally drops the first software-version reply.
+            # Retrying this read avoids losing firmware during onboarding.
+            attempts = 2 if field == "software_version" else 1
+            value = None
+            for _ in range(attempts):
+                value = self._query_mdc_string(ip, port, display_id, cmd)
+                if value:
+                    break
             if value:
                 identity[field] = value
         return identity
@@ -1099,6 +1110,13 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
         model = mdc_info.get("model_name") or upnp_info.get("model") or "QB Series"
         device_name = mdc_info.get("device_name") or upnp_info.get("name") or model
         firmware = mdc_info.get("software_version")
+        logger.info(
+            "Samsung MDC identity ip=%s serial=%s model=%s firmware=%s",
+            ip,
+            bool(serial),
+            model,
+            firmware or "unavailable",
+        )
         return {
             "ip_address":    ip,
             "port":          port,
@@ -1317,4 +1335,3 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
             except Exception:
                 pass
         return status
- 
