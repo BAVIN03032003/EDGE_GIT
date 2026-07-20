@@ -1,0 +1,49 @@
+# Git
+.git
+.github
+.gitignore
+
+# Environment and Secrets
+.env
+.env.*
+! .env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+watchtower-auth.json
+
+# Build Artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+dist/
+*.bin
+edge-app-binary
+
+# Frontend specific
+my-app/node_modules/
+my-app/build/
+node_modules/
+
+# Logs and DB
+logs/
+*.log
+*.sqlite
+*.db
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Setup Scripts
+setup-edge.*
+update-edge.*
+run-edge.bat
+env.template
+setup-auth.*
+start.*
+update-watcher.sh

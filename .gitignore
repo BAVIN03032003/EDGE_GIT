@@ -1,0 +1,36 @@
+# Environment and Secrets
+.env
+.env.*
+!env.template
+! .env.example
+watchtower-auth.json
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Node/React
+node_modules/
+build/
+dist/
+.eslintcache
+
+# Build binaries
+edge-app-binary
+*.bin
+*.exe
+
+# IDEs
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db

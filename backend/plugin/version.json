@@ -1,0 +1,81 @@
+{
+  "version": "v4.0",
+  "updated_at": "2026-04-08 14:09:09",
+  "manifest": [
+    {
+      "key": "cisco_roomos",
+      "module": "cisco_roomos_plugin",
+      "class": "CiscoRoomOSPlugin"
+    },
+    {
+      "key": "crestron_occupancy_sensor",
+      "module": "crestron_occupancy_sensor_plugin",
+      "class": "CrestronOccupancySensorPlugin"
+    },
+    {
+      "key": "crestron_ssh",
+      "module": "crestron_ssh_plugin",
+      "class": "CrestronSSHPlugin"
+    },
+    {
+      "key": "generic_manual",
+      "module": "generic_manual_plugin",
+      "class": "GenericManualPlugin"
+    },
+    {
+      "key": "kramer_via",
+      "module": "kramer_via_plugin",
+      "class": "KramerVIAPlugin"
+    },
+    {
+      "key": "lg_55ef5gl",
+      "module": "lg_55ef5gl_plugin",
+      "class": "LG55EF5GLPlugin"
+    },
+    {
+      "key": "lightware",
+      "module": "lightware_plugin",
+      "class": "LightwarePlugin"
+    },
+    {
+      "key": "logitech_collabos",
+      "module": "logitech_collabos_plugin",
+      "class": "LogitechCollabOSPlugin"
+    },
+    {
+      "key": "netgear_m4250_gs110tpv3",
+      "module": "netgear_m4250_gs110tpv3_plugin",
+      "class": "NetgearM4250GS110TPv3Plugin"
+    },
+    {
+      "key": "poly_videoos",
+      "module": "poly_videoos",
+      "class": "PolyVideoOSPlugin"
+    },
+    {
+      "key": "power_conditioner",
+      "module": "power_conditioner_plugin",
+      "class": "PowerConditionerPlugin"
+    },
+    {
+      "key": "qsys",
+      "module": "qsys_plugin",
+      "class": "QSYSCorePlugin"
+    },
+    {
+      "key": "samsung_mdc",
+      "module": "samsung_mdc_plugin",
+      "class": "SamsungMDCPlugin"
+    },
+    {
+      "key": "sennheiser_tccm",
+      "module": "sennheiser_tccm",
+      "class": "SennheiserTCCMPlugin"
+    },
+    {
+      "key": "shure_mxa920",
+      "module": "shure_mxa920_plugin",
+      "class": "ShureMXA920Plugin"
+    }
+  ]
+}

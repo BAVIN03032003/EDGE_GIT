@@ -1,0 +1,53 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: teampresence-production/gitaction-edge
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: pr-check:latest
+          build-args: |
+            BUILD_VERSION=pr-${{ github.event.pull_request.number }}
+            BUILD_DATE=${{ steps.date.outputs.date }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image size check
+        run: |
+          SIZE=$(docker images pr-check:latest --format '{{.Size}}')
+          echo "Image size: $SIZE"
+          if [[ "$SIZE" > "500MB" ]]; then
+            echo "Warning: Image size exceeds 500MB"
+          fi

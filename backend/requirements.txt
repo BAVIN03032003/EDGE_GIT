@@ -1,0 +1,14 @@
+flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.6
+python-socketio[client]==5.10.0
+eventlet==0.33.3
+psutil==5.9.6
+requests==2.31.0
+urllib3==2.0.7
+paramiko==3.3.1
+pyserial==3.5
+python-dotenv==0.21.0
+mysql-connector-python==8.0.33
+PyJWT==2.8.0
+bcrypt==3.2.0

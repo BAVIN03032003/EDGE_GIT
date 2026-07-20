@@ -1,0 +1,163 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: teampresence-production/gitaction-edge
+  GIT_SHA: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$(echo $VERSION | grep -qE '-(beta|rc|alpha)' && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=sha-
+            type=ref,event=tag,enable=${{ steps.version.outputs.is_prerelease != 'true' }},suffix=,pattern={{branch}}
+            type=raw,value=latest,enable=${{ steps.version.outputs.is_prerelease != 'true' }}
+
+      - name: Build smoke-test image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: release-smoke:latest
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ steps.date.outputs.date }}
+            GIT_SHA=${{ env.GIT_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run smoke test
+        run: |
+          docker run --rm --env-file ./.env.example release-smoke:latest ./edge-app-binary --health || exit 1
+
+      - name: Push to Container Registry
+        uses: docker/build-push-action@v5
+        id: push
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ steps.date.outputs.date }}
+            GIT_SHA=${{ env.GIT_SHA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Get image digest
+        id: digest
+        run: |
+          echo "digest=${{ steps.push.outputs.digest }}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: steps.version.outputs.is_prerelease != 'true'
+        with:
+          body: |
+            ## Edge Application v${{ steps.version.outputs.version }}
+
+            ### Image Information
+            - **Registry**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            - **Tag**: ${{ steps.version.outputs.version }}
+            - **Digest**: ${{ steps.digest.outputs.digest }}
+            - **Platforms**: linux/amd64, linux/arm64
+
+            ### Update Instructions
+            The Edge device will automatically check for updates on next heartbeat.
+            To manually update:
+            ```bash
+            VERSION=${{ steps.version.outputs.version }} /opt/edge/start.sh
+            ```
+
+            ### Rollback
+            To rollback to a previous version:
+            ```bash
+            VERSION=<previous_version> /opt/edge/start.sh
+            ```
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pre-release
+        uses: softprops/action-gh-release@v1
+        if: steps.version.outputs.is_prerelease == 'true'
+        with:
+          body: |
+            ## Edge Application v${{ steps.version.outputs.version }} (Pre-release)
+
+            ### Image Information
+            - **Registry**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            - **Tag**: ${{ steps.version.outputs.version }}
+            - **Digest**: ${{ steps.digest.outputs.digest }}
+
+            **Warning**: This is a pre-release version. Do not use in production.
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify RMM
+        if: vars.RMM_NOTIFY_WEBHOOK != ''
+        run: |
+          curl -X POST ${{ vars.RMM_NOTIFY_WEBHOOK }} \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ steps.version.outputs.version }}",
+              "digest": "${{ steps.digest.outputs.digest }}",
+              "release_url": "${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+            }'
+        continue-on-error: true
