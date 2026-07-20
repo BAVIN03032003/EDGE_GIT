@@ -240,6 +240,7 @@ Manual Platform Plugin: SamsungMDCPlugin
 import socket
 import json
 import os
+import logging
 import threading
 import time
 import re
@@ -251,6 +252,9 @@ import requests
 import xml.etree.ElementTree as ET
 
 from .base import ManualPlatformPlugin
+
+
+logger = logging.getLogger(__name__)
 
 
 class SamsungMDCPlugin(ManualPlatformPlugin):
@@ -359,6 +363,53 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
             except socket.timeout:
                 break
         return buf
+
+    def _query_mdc_data(self, ip, port, id_byte: int, command: int, subcommand=None):
+        """Return the data bytes from a successful Samsung MDC query."""
+        payload = [command, id_byte]
+        if subcommand is None:
+            payload.append(0)
+        else:
+            payload.extend([1, subcommand])
+        packet = bytes([0xAA, *payload, sum(payload) & 0xFF])
+
+        try:
+            with self.connect(ip, port) as sock:
+                sock.sendall(packet)
+                response = b""
+                deadline = time.time() + 3
+                while time.time() < deadline:
+                    sock.settimeout(max(deadline - time.time(), 0.1))
+                    try:
+                        chunk = sock.recv(256)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    response += chunk
+                    if len(response) >= 4 and len(response) >= 4 + response[3] + 1:
+                        break
+        except OSError:
+            return None
+
+        if len(response) < 7 or response[:2] != b"\xAA\xFF":
+            return None
+
+        length = response[3]
+        if len(response) < 4 + length + 1 or response[4] != 0x41:
+            return None
+
+        data = response[6:6 + max(length - 2, 0)]
+        if subcommand is not None and data[:1] == bytes([subcommand]):
+            data = data[1:]
+        return data
+
+    def _query_mdc_string(self, ip, port, id_byte: int, command: int):
+        data = self._query_mdc_data(ip, port, id_byte, command)
+        if not data:
+            return None
+        value = data.split(b"\x00", 1)[0].decode("ascii", errors="replace").strip()
+        return value or None
 
     def _parse_reply(self, response: bytes):
         """
@@ -509,17 +560,32 @@ class SamsungMDCPlugin(ManualPlatformPlugin):
         mac = get_mac() if is_online else None
         upnp_info = self._discover_upnp(ip) if is_online else {}
 
+        # Samsung MDC exposes serial/model identity on port 1515. This is more
+        # reliable in containers than multicast UPnP discovery.
+        id_byte = self._parse_id(display_id)
+        mdc_serial = self._query_mdc_string(ip, port, id_byte, 0x0B) if is_online else None
+        mdc_model = self._query_mdc_string(ip, port, id_byte, 0x8A) if is_online else None
+        mdc_name = self._query_mdc_string(ip, port, id_byte, 0x67) if is_online else None
+
         configured_mac = self.config.get("mac_address") or self.config.get("mac")
         configured_serial = self.config.get("serial_number") or self.config.get("serial")
         mac = mac or configured_mac
-        serial = upnp_info.get("serial") or configured_serial or mac
+        serial = mdc_serial or upnp_info.get("serial") or configured_serial or mac
+        model = mdc_model or upnp_info.get("model") or "QB Series"
+        logger.info(
+            "Samsung MDC identity: ip=%s serial_source=%s mac_source=%s",
+            ip,
+            "mdc" if mdc_serial else ("upnp" if upnp_info.get("serial") else ("config" if configured_serial else "mac-or-unavailable")),
+            "network" if mac and not configured_mac else ("config" if configured_mac else "unavailable"),
+        )
         
         return {
             "ip_address":    ip,
             "port":          port,
             "display_id":    display_id,
             "make":          "Samsung",
-            "model":         upnp_info.get("model") or "QB Series",
+            "model":         model,
+            "device_name":   mdc_name or upnp_info.get("name") or f"Samsung {model}",
             "serial_number": serial,
             "mac_address":   mac,
             "current_status": "Online" if is_online else "Offline",
