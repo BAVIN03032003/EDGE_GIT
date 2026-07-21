@@ -5,6 +5,7 @@ EDGE_HOME="/opt/edge"
 LOGS_DIR="$EDGE_HOME/logs"
 ENV_FILE="$EDGE_HOME/.env"
 AUTH_FILE="$(pwd)/watchtower-auth.json"
+TOKEN_FILE="$EDGE_HOME/.ghcr-token"
  
 log_info() { echo -e "\033[0;36m[INFO] $1\033[0m"; }
 log_success() { echo -e "\033[0;32m[SUCCESS] $1\033[0m"; }
@@ -75,8 +76,21 @@ log_info "Configuring GitHub Authentication for updates..."
 USER_GH="BAVIN03032003"
 TOKEN_GH="${GHCR_TOKEN:-}"
 if [ -z "$TOKEN_GH" ]; then
-    read -rsp "Enter GHCR token: " TOKEN_GH
-    echo
+    if [ -f "$TOKEN_FILE" ]; then
+        TOKEN_GH=$(cat "$TOKEN_FILE")
+    else
+        log_info "GHCR token is required once to pull private images and enable updates."
+        read -rsp "Enter GHCR token: " TOKEN_GH
+        echo
+        if [ -z "$TOKEN_GH" ]; then
+            log_error "The GHCR token cannot be empty."
+            exit 1
+        fi
+        umask 077
+        printf '%s' "$TOKEN_GH" > "$TOKEN_FILE"
+        chmod 600 "$TOKEN_FILE"
+        log_success "GHCR token saved for future runs."
+    fi
 fi
 AUTH=$(echo -n "${USER_GH}:${TOKEN_GH}" | base64)
  

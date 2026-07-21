@@ -51,8 +51,8 @@ function ConvertFrom-SecureToken([securestring]$SecureToken) {
 }
 
 function Get-GhcrToken {
-    if ($env:GHCR_TOKEN) {
-        return $env:GHCR_TOKEN
+    if (-not [string]::IsNullOrWhiteSpace($env:GHCR_TOKEN)) {
+        return $env:GHCR_TOKEN.Trim()
     }
 
     if (Test-Path $TokenFile) {
