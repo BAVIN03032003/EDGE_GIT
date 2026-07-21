@@ -11,7 +11,7 @@ services:
     volumes:
       # Use environment variables for paths to support both Linux (/opt/edge) and Windows (C:/edge)
       - ${LOGS_DIR:-./logs}:/app/logs
-      - ${ENV_FILE:-.env}:/app/.env:ro
+      - ${ENV_FILE:-.env}:/app/.env
       # The GHCR image is started through this script; keep the host copy in Linux LF format.
       - ./docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
     environment:
