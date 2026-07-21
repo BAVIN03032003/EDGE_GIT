@@ -12,6 +12,47 @@ function Write-Info([string]$Message) {
 function Write-Success([string]$Message) {
     Write-Host "[SUCCESS] $Message" -ForegroundColor Green
 }
+
+function Read-GhcrToken {
+    if ($env:GHCR_TOKEN) {
+        return $env:GHCR_TOKEN.Trim()
+    }
+
+    $secureToken = Read-Host "Enter GitHub PAT (read:packages)" -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr).Trim()
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
+}
+
+function Login-Ghcr([string]$Username, [string]$Token) {
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        throw "No GHCR token was supplied. Create a GitHub PAT with the read:packages scope."
+    }
+
+    # Use a redirected native process so the token reaches Docker exactly as entered.
+    $processInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $processInfo.FileName = "docker"
+    $processInfo.Arguments = "login ghcr.io -u $Username --password-stdin"
+    $processInfo.UseShellExecute = $false
+    $processInfo.RedirectStandardInput = $true
+    $processInfo.RedirectStandardError = $true
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $processInfo
+    [void]$process.Start()
+    $process.StandardInput.WriteLine($Token)
+    $process.StandardInput.Close()
+    $errorOutput = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if ($process.ExitCode -ne 0) {
+        throw "GHCR login failed: $errorOutput"
+    }
+}
  
 # 1. Set Execution Policy
 Write-Info "Setting Execution Policy..."
@@ -57,26 +98,30 @@ if (-not (Test-Path $EnvFile)) {
     Write-Success "Created default .env at $EnvFile. Please update it with your credentials."
 }
  
-# 4. GitHub Setup (Watchtower Auth)
-Write-Info "Configuring GitHub Authentication for updates..."
+# 4. GitHub Setup (optional; required only for private GHCR pulls and Watchtower updates)
 $User = "BAVIN03032003"
 $Token = $env:GHCR_TOKEN
-if (-not $Token) {
-    $SecureToken = Read-Host "Enter GHCR token" -AsSecureString
-    $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken))
+if ($Token) {
+    Write-Info "Configuring GitHub Authentication for private-image updates..."
+    $Token = Read-GhcrToken
+    $Auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${User}:${Token}"))
+    $Config = @{ auths = @{ "ghcr.io" = @{ auth = $Auth } } }
+} else {
+    Write-Info "No GHCR_TOKEN set; building and running the image locally."
+    $Config = @{ auths = @{} }
 }
-$Token = ($Token -replace '[\p{C}\s]', '')
-$Auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${User}:${Token}"))
-$Config = @{ auths = @{ "ghcr.io" = @{ auth = $Auth } } }
 $Config | ConvertTo-Json | Out-File -FilePath $AuthFile -Encoding ascii
-Write-Success "Authentication configured in $AuthFile"
+Write-Success "Watchtower configuration written to $AuthFile"
  
 # 4.5 Login to GHCR for the host
-Write-Info "Logging into GHCR for host Docker daemon..."
-$Token | docker login ghcr.io -u $User --password-stdin | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "GHCR login failed. Use a BAVIN03032003 PAT with read:packages access."
-    exit 1
+if ($Token) {
+    Write-Info "Logging into GHCR for host Docker daemon..."
+    try {
+        Login-Ghcr -Username $User -Token $Token
+    } catch {
+        Write-Error $_.Exception.Message
+        exit 1
+    }
 }
  
 # 5. Check for Docker
@@ -164,18 +209,18 @@ if (-not $dockerRunning) {
     exit 1
 }
  
-# 6. Start Docker Compose
-Write-Info "Starting Edge application via Docker Compose..."
+# 6. Build and start Docker Compose
+Write-Info "Building the local Edge Docker image..."
 $env:LOGS_DIR = $LogsDir
 $env:ENV_FILE = $EnvFile
 $env:IS_MANUAL_UPDATE = 0
  
 if (Get-Command "docker-compose" -ErrorAction SilentlyContinue) {
+    docker-compose build edge
     docker-compose up -d
-    docker-compose up -d --force-recreate updater
 } else {
+    docker compose build edge
     docker compose up -d
-    docker compose up -d --force-recreate updater
 }
  
 Write-Success "Edge application is starting!"
