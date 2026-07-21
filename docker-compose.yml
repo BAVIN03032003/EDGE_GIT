@@ -2,9 +2,6 @@ services:
   edge:
     container_name: edge-app
     image: ghcr.io/bavin03032003/edge_git:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
     # Support ARM64 and AMD64 via fallback platform
     platform: ${DOCKER_DEFAULT_PLATFORM:-linux/amd64}
     restart: unless-stopped
@@ -37,7 +34,6 @@ services:
     container_name: edge-updater
     platform: ${DOCKER_DEFAULT_PLATFORM:-linux/amd64}
     restart: unless-stopped
-    profiles: ["updates"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./watchtower-auth.json:/config.json:ro
