@@ -13,6 +13,32 @@ function Write-Success([string]$Message) {
     Write-Host "[SUCCESS] $Message" -ForegroundColor Green
 }
 
+function Login-Ghcr([string]$Username, [string]$Token) {
+    if ([string]::IsNullOrWhiteSpace($Token)) {
+        throw "The GHCR token is empty. Enter a GitHub PAT with read:packages access."
+    }
+
+    # Redirect standard input explicitly so Docker receives the PAT reliably.
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = "docker"
+    $startInfo.Arguments = "login ghcr.io -u $Username --password-stdin"
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardError = $true
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $process.StandardInput.WriteLine($Token)
+    $process.StandardInput.Close()
+    $errorOutput = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if ($process.ExitCode -ne 0) {
+        throw "GHCR login failed: $errorOutput"
+    }
+}
+
 # 1. Set Execution Policy
 Write-Info "Setting Execution Policy..."
 try {
@@ -63,7 +89,12 @@ $User = "BAVIN03032003"
 $Token = $env:GHCR_TOKEN
 if (-not $Token) {
     $SecureToken = Read-Host "Enter GHCR token" -AsSecureString
-    $Token = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken))
+    $TokenPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureToken)
+    try {
+        $Token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($TokenPointer)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($TokenPointer)
+    }
 }
 $Token = ($Token -replace '[\p{C}\s]', '')
 $Auth = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("${User}:${Token}"))
@@ -73,9 +104,10 @@ Write-Success "Authentication configured in $AuthFile"
  
 # 4.5 Login to GHCR for the host
 Write-Info "Logging into GHCR for host Docker daemon..."
-$Token | docker login ghcr.io -u $User --password-stdin | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "GHCR login failed. Use a BAVIN03032003 PAT with read:packages access."
+try {
+    Login-Ghcr -Username $User -Token $Token
+} catch {
+    Write-Error $_.Exception.Message
     exit 1
 }
  
